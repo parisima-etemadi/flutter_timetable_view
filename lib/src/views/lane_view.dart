@@ -4,21 +4,21 @@ import 'package:flutter_timetable_view/src/models/table_event_time.dart';
 import 'package:flutter_timetable_view/src/styles/background_painter.dart';
 import 'package:flutter_timetable_view/src/styles/timetable_style.dart';
 import 'package:flutter_timetable_view/src/views/event_view.dart';
-
+List<TableEventTime> selectedItems = [];
 class LaneView extends StatelessWidget {
   final List<TableEvent> events;
   final TimetableStyle timetableStyle;
   final Color statusColor;
   /// Index is used to uniquely identify each lane
   final int index;
+  final bool isMultiSelectEnabled;
 
   final Function(int laneIndex, TableEventTime start, TableEventTime end)
   onEmptyCellTap;
 
   /// Called when an event is tapped
   final void Function(TableEvent event) onEventTap;
-
-  const LaneView({
+   LaneView({
     Key? key,
     required this.events,
     required this.timetableStyle,
@@ -26,6 +26,7 @@ class LaneView extends StatelessWidget {
     required this.onEmptyCellTap,
     required this.onEventTap,
     required this.statusColor,
+     required this.isMultiSelectEnabled,
   })  : super(key: key);
 
   @override
@@ -74,33 +75,57 @@ class LaneView extends StatelessWidget {
   }
 
   /// Draws the Empty Time Slot for each Lane
-  _buildEmptyTimeSlots(int laneIndex) {
-    List<_EmptyTimeSlot> emptyTimeSlots = <_EmptyTimeSlot>[];
+  ///
 
-    // I don't know if this is performant but i cant think of something else for now
+  _buildEmptyTimeSlots(int laneIndex) {
+    List<EmptyTimeSlot> emptyTimeSlots = <EmptyTimeSlot>[];
+
     for (int i = timetableStyle.startHour; i < timetableStyle.endHour; i++) {
-      emptyTimeSlots.add(_EmptyTimeSlot(
+      emptyTimeSlots.add(EmptyTimeSlot(
         timetableStyle: timetableStyle,
         laneIndex: laneIndex,
         onTap: onEmptyCellTap,
+        isMultiSelectEnabled: isMultiSelectEnabled,
+        onSelectionChanged: (isSelected) {
+        //  isSelected = Widget.isSelected;
+        },
         start: TableEventTime(hour: i, minute: 0),
         end: TableEventTime(hour: i + 1, minute: 0),
       ));
     }
 
+
     return emptyTimeSlots;
   }
 }
 
-class _EmptyTimeSlot extends StatelessWidget {
+class EmptyTimeSlot extends StatefulWidget {
   final TimetableStyle timetableStyle;
   final int laneIndex;
   final TableEventTime start;
   final TableEventTime end;
   final Function(int laneIndex, TableEventTime start, TableEventTime end) onTap;
+  final Function(bool isSelected) onSelectionChanged;
+  final bool isMultiSelectEnabled;
+  const EmptyTimeSlot({
+    Key? key,
+    required this.laneIndex,
+    required this.start,
+    required this.end,
+    required this.onTap,
+    required this.onSelectionChanged,
+    required this.timetableStyle,
+    required this.isMultiSelectEnabled,
+  }) : super(key: key);
 
-  _EmptyTimeSlot(
-      {required this.laneIndex, required this.start, required this.end, required this.onTap, required this.timetableStyle,});
+  @override
+  EmptyTimeSlotState createState() => EmptyTimeSlotState();
+}
+// New
+class EmptyTimeSlotState extends State<EmptyTimeSlot> {
+
+  bool isSelected = false;
+
 
   @override
   Widget build(BuildContext context) {
@@ -108,29 +133,45 @@ class _EmptyTimeSlot extends StatelessWidget {
       top: top(),
       height: height(),
       left: 0,
-      width: timetableStyle.laneWidth,
+      width: widget.timetableStyle.laneWidth,
       child: GestureDetector(
-        onTap: () {
-          onTap(laneIndex, start, end);
-        },
+          onTap: () {
+            if (widget.isMultiSelectEnabled) {
+              setState(() {
+                isSelected = !isSelected;
+                if (isSelected) {
+                  selectedItems.add(widget.start);
+
+                } else {
+                  selectedItems.remove(widget.start);
+                }
+              });
+            }
+            widget.onTap(widget.laneIndex, widget.start, widget.end);
+          },
         child: Container(
-          decoration: BoxDecoration(color: Colors.transparent),
+          decoration: BoxDecoration(
+              color: isSelected ? Theme.of(context).colorScheme.secondary : Colors.transparent),
           margin: const EdgeInsets.all(1),
           padding: const EdgeInsets.all(1),
         ),
+
       ),
+
     );
+
+
   }
 
   double top() {
     return calculateTopOffset(
-        start.hour, start.minute, timetableStyle.timeItemHeight) -
-        timetableStyle.startHour * timetableStyle.timeItemHeight;
+        widget.start.hour, widget.start.minute, widget.timetableStyle.timeItemHeight) -
+        widget.timetableStyle.startHour * widget.timetableStyle.timeItemHeight;
   }
 
   double height() {
     return calculateTopOffset(
-        0, end.difference(start).inMinutes, timetableStyle.timeItemHeight) +
+        0, widget.end.difference(widget.start).inMinutes, widget.timetableStyle.timeItemHeight) +
         1;
   }
 
@@ -142,4 +183,3 @@ class _EmptyTimeSlot extends StatelessWidget {
     return (hour + (minute / 60)) * (hourRowHeight ?? 60);
   }
 }
-
